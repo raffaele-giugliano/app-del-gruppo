@@ -57,10 +57,8 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
 
     try {
       final csvService = CsvService(backendBaseUrl: widget.backendBaseUrl);
-      // Risoluzione URL tramite Cloudflare Worker
       final csvUrl = await csvService.getCsvUrlForGroup(groupName);
 
-      // Salva il gruppo in memoria locale
       await _storageService.saveGroup(groupName);
 
       if (!mounted) return;
@@ -110,7 +108,7 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
           child: SingleChildScrollView(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.stretch, // <--- Corretto qui (CrossAxisAlignment)
               children: [
                 const Icon(
                   Icons.groups_rounded,
@@ -120,7 +118,6 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
                 const SizedBox(height: 24),
 
                 if (_savedGroup != null) ...[
-                  // --- VISTA GRUPPO GIÀ MEMORIZZATO ---
                   Text(
                     'Gruppo Memorizzato:',
                     textAlign: TextAlign.center,
@@ -141,7 +138,6 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
                   ),
                   const SizedBox(height: 32),
 
-                  // BOTTONE PRINCIPALE RISALTATO: Accedi ai Dati
                   ElevatedButton(
                     onPressed: _isSearching ? null : () => _submitGroup(_savedGroup!),
                     style: ElevatedButton.styleFrom(
@@ -166,7 +162,6 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // BOTTONE SECONDARIO: Cambia Gruppo
                   OutlinedButton(
                     onPressed: _resetGroup,
                     style: OutlinedButton.styleFrom(
@@ -179,7 +174,6 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
                     child: const Text('Cambia Gruppo'),
                   ),
                 ] else ...[
-                  // --- VISTA PRIMO INSERIMENTO / NUOVA RICERCA ---
                   const Text(
                     'Inserisci il nome del tuo gruppo per accedere al calendario ed alle informazioni dedicate.',
                     textAlign: TextAlign.center,
@@ -201,7 +195,6 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // BOTTONE CONFERMA DIGITAZIONE IN EVIDENZA
                   ElevatedButton(
                     onPressed: _isSearching ? null : () => _submitGroup(_groupController.text),
                     style: ElevatedButton.styleFrom(
