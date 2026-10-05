@@ -50,7 +50,7 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
       setState(() {
         _pages = pages;
         _isLoading = false;
-        _isGroupConfirmed = true; // Blocca il nome del gruppo
+        _isGroupConfirmed = true;
       });
     } catch (e) {
       setState(() {
@@ -93,10 +93,9 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Campo Testo Nome Gruppo
             TextField(
               controller: _groupController,
-              enabled: !_isGroupConfirmed, // Disabilitato quando il gruppo è confermato
+              enabled: !_isGroupConfirmed,
               decoration: InputDecoration(
                 labelText: 'Nome Gruppo',
                 prefixIcon: const Icon(Icons.group),
@@ -110,7 +109,6 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
             ),
             const SizedBox(height: 12),
 
-            // Tasto Cerca Gruppo o Tasto Cambia Gruppo con freccia <-
             if (!_isGroupConfirmed)
               ElevatedButton.icon(
                 onPressed: _isLoading ? null : _searchGroup,
@@ -185,11 +183,11 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Bottone di conferma: disabilitato se _selectedPage == null
+              // Bottone uniformato in blu con testo bianco
               ElevatedButton(
                 onPressed: _selectedPage == null ? null : _confirmPageSelection,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
+                  backgroundColor: Colors.blueAccent,
                   foregroundColor: Colors.white,
                   disabledBackgroundColor: Colors.grey.shade300,
                   disabledForegroundColor: Colors.grey.shade600,
