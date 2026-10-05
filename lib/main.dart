@@ -1,22 +1,28 @@
 import 'package:flutter/material.dart';
-import 'screens/home_screen.dart';
+import 'models/app_config.dart';
+import 'screens/group_selection_screen.dart';
 
 void main() {
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final appConfig = AppConfig(groupName: '');
+
     return MaterialApp(
-      title: 'Multi-Group App',
+      title: 'App del Gruppo',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        primarySwatch: Colors.blue,
         useMaterial3: true,
       ),
-      home: const HomeScreen(),
+      home: GroupSelectionScreen(
+        backendBaseUrl: appConfig.backendBaseUrl,
+      ),
     );
   }
 }

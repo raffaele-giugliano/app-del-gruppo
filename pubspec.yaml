@@ -1,0 +1,6 @@
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  csv: ^6.0.0
+  shared_preferences: ^2.2.2  # <--- Aggiungi questa riga

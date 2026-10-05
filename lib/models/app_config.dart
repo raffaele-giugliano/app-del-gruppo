@@ -4,7 +4,7 @@ class AppConfig {
 
   AppConfig({
     required this.groupName,
-    this.backendBaseUrl = 'https://mio-worker.tuousername.workers.dev',
+    this.backendBaseUrl = 'https://app-del-gruppo.raffaele-giugliano.workers.dev',
   });
 
   bool get hasGroup => groupName.isNotEmpty;
