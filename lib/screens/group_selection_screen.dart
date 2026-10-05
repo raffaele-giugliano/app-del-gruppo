@@ -4,7 +4,9 @@ import '../services/csv_service.dart';
 import 'table_view_screen.dart';
 
 class GroupSelectionScreen extends StatefulWidget {
-  const GroupSelectionScreen({Key? key}) : super(key: key);
+  final String? backendBaseUrl;
+
+  const GroupSelectionScreen({Key? key, this.backendBaseUrl}) : super(key: key);
 
   @override
   State<GroupSelectionScreen> createState() => _GroupSelectionScreenState();
@@ -12,15 +14,20 @@ class GroupSelectionScreen extends StatefulWidget {
 
 class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
   final TextEditingController _groupController = TextEditingController();
-  final CsvService _csvService = CsvService(
-    backendBaseUrl:
-        'https://script.google.com/macros/s/AKfycbwqgA2-32aKByzYv9uM3Nks2p9q0I-U6q0_SXXD_4L0Q-73Amlu100QO5JByy4wT-yE/exec',
-  );
+  late final CsvService _csvService;
 
   bool _isLoading = false;
   String? _errorMessage;
   List<PageConfig> _pages = [];
   PageConfig? _selectedPage;
+
+  @override
+  void initState() {
+    super.initState();
+    final url = widget.backendBaseUrl ??
+        'https://script.google.com/macros/s/AKfycbwqgA2-32aKByzYv9uM3Nks2p9q0I-U6q0_SXXD_4L0Q-73Amlu100QO5JByy4wT-yE/exec';
+    _csvService = CsvService(backendBaseUrl: url);
+  }
 
   Future<void> _searchGroup() async {
     final groupName = _groupController.text.trim();
