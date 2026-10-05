@@ -1,0 +1,11 @@
+{
+    "name": "App del Gruppo",
+    "short_name": "AppGruppo",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#2196F3",
+    "description": "Applicazione PWA per gestione gruppo",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false
+}
