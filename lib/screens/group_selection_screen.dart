@@ -1,15 +1,10 @@
 import 'package:flutter/material.dart';
-import '../services/storage_service.dart';
-import '../services/csv_service.dart';
 import '../models/page_config.dart';
+import '../services/csv_service.dart';
+import 'table_view_screen.dart';
 
 class GroupSelectionScreen extends StatefulWidget {
-  final String backendBaseUrl;
-
-  const GroupSelectionScreen({
-    Key? key,
-    required this.backendBaseUrl,
-  }) : super(key: key);
+  const GroupSelectionScreen({Key? key}) : super(key: key);
 
   @override
   State<GroupSelectionScreen> createState() => _GroupSelectionScreenState();
@@ -17,279 +12,123 @@ class GroupSelectionScreen extends StatefulWidget {
 
 class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
   final TextEditingController _groupController = TextEditingController();
-  final StorageService _storageService = StorageService();
+  final CsvService _csvService = CsvService(
+    backendBaseUrl:
+        'https://script.google.com/macros/s/AKfycbwqgA2-32aKByzYv9uM3Nks2p9q0I-U6q0_SXXD_4L0Q-73Amlu100QO5JByy4wT-yE/exec',
+  );
 
-  String? _savedGroup;
-  bool _isLoading = true;
-  bool _isSearching = false;
+  bool _isLoading = false;
   String? _errorMessage;
-
-  List<PageConfig> _availablePages = [];
+  List<PageConfig> _pages = [];
   PageConfig? _selectedPage;
 
-  @override
-  void initState() {
-    super.initState();
-    _checkSavedGroup();
-  }
-
-  /// Verifica se esiste un gruppo memorizzato localmente all'avvio
-  Future<void> _checkSavedGroup() async {
-    final group = await _storageService.getSavedGroup();
-    setState(() {
-      _savedGroup = group;
-      if (group != null) {
-        _groupController.text = group;
-      }
-      _isLoading = false;
-    });
-
-    if (group != null) {
-      _loadGroupData(group);
-    }
-  }
-
-  /// Recupera l'URL dal Backend, scarica il CSV indice e popola le pagine
-  Future<void> _loadGroupData(String groupName) async {
-    if (groupName.trim().isEmpty) {
-      setState(() {
-        _errorMessage = 'Inserisci il nome del gruppo';
-      });
-      return;
-    }
+  Future<void> _searchGroup() async {
+    final groupName = _groupController.text.trim();
+    if (groupName.isEmpty) return;
 
     setState(() {
-      _isSearching = true;
+      _isLoading = true;
       _errorMessage = null;
-      _availablePages = [];
+      _pages = [];
       _selectedPage = null;
     });
 
     try {
-      final csvService = CsvService(backendBaseUrl: widget.backendBaseUrl);
-      
-      // 1. Chiamata al Worker Backend per ottenere l'URL dell'indice
-      final indexCsvUrl = await csvService.getCsvUrlForGroup(groupName);
-
-      // 2. Scaricamento e parsing dell'indice CSV
-      final pages = await csvService.fetchGroupIndex(indexCsvUrl);
-
-      // Salva il gruppo valido in locale
-      await _storageService.saveGroup(groupName);
-
-      if (!mounted) return;
+      final indexCsvUrl = await _csvService.getCsvUrlForGroup(groupName);
+      final pages = await _csvService.fetchGroupIndex(indexCsvUrl);
 
       setState(() {
-        _savedGroup = groupName;
-        _availablePages = pages;
-        if (pages.isNotEmpty) {
-          _selectedPage = pages.first;
-        }
-        _isSearching = false;
+        _pages = pages;
+        _isLoading = false;
       });
     } catch (e) {
-      if (!mounted) return;
       setState(() {
-        // Mostra il messaggio esatto dell'eccezione per identificare la causa (CORS, 404, parsing, ecc.)
         _errorMessage = e.toString().replaceAll('Exception: ', '');
-        _isSearching = false;
+        _isLoading = false;
       });
     }
   }
 
-  /// Cancella il gruppo salvato e ripristina la schermata di ricerca
-  Future<void> _resetGroup() async {
-    await _storageService.clearGroup();
-    setState(() {
-      _savedGroup = null;
-      _groupController.clear();
-      _errorMessage = null;
-      _availablePages = [];
-      _selectedPage = null;
-    });
-  }
-
-  /// Azione alla conferma della pagina selezionata dal menu a tendina
   void _confirmPageSelection() {
     if (_selectedPage == null) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Pagina selezionata: ${_selectedPage!.pageName} (${_selectedPage!.tables.length} tabelle collegate)',
-        ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TableViewScreen(pageConfig: _selectedPage!),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Accesso Gruppo'),
+        title: const Text('Selezione Gruppo'),
         centerTitle: true,
       ),
       body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Center(
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Icon(
-                  Icons.groups_rounded,
-                  size: 80,
-                  color: Colors.blueAccent,
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _groupController,
+              decoration: InputDecoration(
+                labelText: 'Nome Gruppo',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(height: 24),
-
-                if (_savedGroup != null) ...[
-                  Text(
-                    'Gruppo Memorizzato:',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[700],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _savedGroup!,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  if (_isSearching) ...[
-                    const Center(child: CircularProgressIndicator()),
-                  ] else if (_availablePages.isNotEmpty) ...[
-                    DropdownButtonFormField<PageConfig>(
-                      value: _selectedPage,
-                      decoration: InputDecoration(
-                        labelText: 'Seleziona Pagina',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        prefixIcon: const Icon(Icons.web_rounded),
-                      ),
-                      items: _availablePages.map((page) {
-                        return DropdownMenuItem<PageConfig>(
-                          value: page,
-                          child: Text(page.pageName),
-                        );
-                      }).toList(),
-                      onChanged: (PageConfig? newPage) {
-                        setState(() {
-                          _selectedPage = newPage;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 20),
-
-                    ElevatedButton(
-                      onPressed: _confirmPageSelection,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blueAccent[700],
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                        elevation: 5,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'CONFERMA SELEZIONE PAGINA',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ] else ...[
-                    const Text(
-                      'Nessuna pagina disponibile per questo gruppo.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.red),
-                    ),
-                  ],
-
-                  if (_errorMessage != null) ...[
-                    const SizedBox(height: 16),
-                    Text(
-                      _errorMessage!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.red, fontSize: 13),
-                    ),
-                  ],
-
-                  const SizedBox(height: 16),
-                  OutlinedButton(
-                    onPressed: _resetGroup,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      side: const BorderSide(color: Colors.grey),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text('Cambia Gruppo'),
-                  ),
-                ] else ...[
-                  const Text(
-                    'Inserisci il nome del tuo gruppo per accedere al calendario ed alle informazioni dedicate.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 15, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 24),
-
-                  TextField(
-                    controller: _groupController,
-                    decoration: InputDecoration(
-                      labelText: 'Nome Gruppo',
-                      hintText: 'La_mia_squadra',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      prefixIcon: const Icon(Icons.search),
-                      errorText: _errorMessage,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  ElevatedButton(
-                    onPressed: _isSearching ? null : () => _loadGroupData(_groupController.text),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blueAccent[700],
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      elevation: 5,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: _isSearching
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                          )
-                        : const Text(
-                            'CONFERMA E CERCA',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1),
-                          ),
-                  ),
-                ],
-              ],
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.arrow_forward),
+                  onPressed: _searchGroup,
+                ),
+              ),
+              onSubmitted: (_) => _searchGroup(),
             ),
-          ),
+            const SizedBox(height: 16),
+            if (_isLoading)
+              const Center(child: CircularProgressIndicator())
+            else if (_errorMessage != null)
+              Text(
+                _errorMessage!,
+                style: const TextStyle(color: Colors.red),
+              )
+            else if (_pages.isNotEmpty) ...[
+              DropdownButtonFormField<PageConfig>(
+                decoration: InputDecoration(
+                  labelText: 'Seleziona Pagina',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                value: _selectedPage,
+                items: _pages.map((page) {
+                  return DropdownMenuItem<PageConfig>(
+                    value: page,
+                    child: Text(page.pageName),
+                  );
+                }).toList(),
+                onChanged: (val) {
+                  setState(() {
+                    _selectedPage = val;
+                  });
+                },
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _selectedPage == null ? null : _confirmPageSelection,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text('CONFERMA SELEZIONE PAGINA'),
+              ),
+            ],
+          ],
         ),
       ),
     );
