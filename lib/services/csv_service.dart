@@ -7,7 +7,7 @@ class CsvService {
 
   CsvService({required this.backendBaseUrl});
 
-  /// 1. Recupera l'URL dal Backend e lo pulisce da caratteri invisibili
+  /// 1. Recupera la risposta JSON dal Backend ed estrae la chiave 'csvUrl'
   Future<String> getCsvUrlForGroup(String groupName) async {
     final cleanGroup = groupName.trim();
     final url = '$backendBaseUrl?group=${Uri.encodeComponent(cleanGroup)}';
@@ -18,37 +18,37 @@ class CsvService {
       throw Exception('Errore Backend (HTTP ${response.statusCode})');
     }
 
-    // Pulizia rigorosa da spazi, virgolette e a capo
-    String rawUrl = response.body.trim();
-    rawUrl = rawUrl.replaceAll('\r', '').replaceAll('\n', '');
-    if (rawUrl.startsWith('"') && rawUrl.endsWith('"')) {
-      rawUrl = rawUrl.substring(1, rawUrl.length - 1);
+    // Decodifica il JSON restituito dal BE
+    final Map<String, dynamic> data = jsonDecode(response.body);
+
+    if (!data.containsKey('csvUrl') || data['csvUrl'] == null) {
+      throw Exception('Il backend non ha restituito la chiave "csvUrl"');
     }
 
-    if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
-      throw Exception('URL dal backend non valido: "$rawUrl"');
+    final String csvUrl = data['csvUrl'].toString().trim();
+
+    if (!csvUrl.startsWith('http://') && !csvUrl.startsWith('https://')) {
+      throw Exception('L\'URL contenuto in csvUrl non è valido: "$csvUrl"');
     }
 
-    return rawUrl;
+    return csvUrl;
   }
 
-  /// 2. Scarica il file CSV usando esattamente lo stesso metodo delle app precedenti
+  /// 2. Scarica il file CSV dall'URL ottenuto dal BE
   Future<List<PageConfig>> fetchGroupIndex(String indexCsvUrl) async {
-    // Usiamo Uri.parse direttamente sulla stringa pulita, esattamente come per i link hardcoded
     final uri = Uri.parse(indexCsvUrl.trim());
 
     final response = await http.get(uri);
 
     if (response.statusCode != 200) {
-      throw Exception('Errore download CSV (HTTP ${response.statusCode})');
+      throw Exception('Impossibile scaricare il file CSV (HTTP ${response.statusCode})');
     }
 
-    // Decodifica UTF-8
     final csvContent = utf8.decode(response.bodyBytes);
     return parseIndexCsv(csvContent);
   }
 
-  /// 3. Parsing delle righe CSV
+  /// 3. Parsing del contenuto CSV dell'indice
   List<PageConfig> parseIndexCsv(String csvContent) {
     final lines = LineSplitter.split(csvContent)
         .where((line) => line.trim().isNotEmpty)
@@ -84,7 +84,7 @@ class CsvService {
     }
 
     if (pageMap.isEmpty) {
-      throw Exception('Nessun dato trovato nel CSV.');
+      throw Exception('Nessuna pagina/tabella valida trovata nel CSV.');
     }
 
     return pageMap.entries
