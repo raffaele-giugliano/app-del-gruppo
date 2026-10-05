@@ -1,5 +1,5 @@
+import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:csv/csv.dart';
 import '../models/page_config.dart';
 
 class CsvService {
@@ -7,64 +7,115 @@ class CsvService {
 
   CsvService({required this.backendBaseUrl});
 
+  /// Chiede al Backend/Worker l'URL dell'indice CSV per un determinato gruppo
   Future<String> getCsvUrlForGroup(String groupName) async {
-    final response = await http.get(
-      Uri.parse('$backendBaseUrl?group=${Uri.encodeComponent(groupName)}'),
-    );
+    final cleanGroup = groupName.trim();
+    final uri = Uri.parse('$backendBaseUrl?group=$cleanGroup');
 
-    if (response.statusCode == 200) {
-      final url = response.body.trim();
-      if (url.startsWith('http://') || url.startsWith('https://')) {
-        return url;
-      }
-      throw Exception('URL non valido restituito dal backend: "$url"');
-    } else {
-      throw Exception('Errore Worker Backend (${response.statusCode}): ${response.body}');
-    }
-  }
-
-  Future<List<PageConfig>> fetchGroupIndex(String indexCsvUrl) async {
-    final response = await http.get(Uri.parse(indexCsvUrl));
+    final response = await http.get(uri);
 
     if (response.statusCode != 200) {
-      throw Exception('Errore download CSV indice (HTTP ${response.statusCode})');
+      throw Exception('Gruppo non trovato o errore backend (${response.statusCode})');
     }
 
-    // Normalizza i fine riga (\r\n -> \n)
-    final String csvRaw = response.body.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    // Pulizia della stringa restituita dal backend
+    final rawUrl = response.body.trim().replaceAll('\r', '').replaceAll('\n', '');
 
-    final List<List<dynamic>> rows = const CsvToListConverter(
-      shouldParseNumbers: false,
-    ).convert(csvRaw);
-
-    if (rows.length <= 1) {
-      throw Exception('Il file CSV scaricato è vuoto o contiene solo l\'intestazione.');
+    final parsedUri = Uri.tryParse(rawUrl);
+    if (parsedUri == null || !parsedUri.hasAbsolutePath) {
+      throw Exception('L\'URL restituito dal backend non è valido: "$rawUrl"');
     }
 
-    final Map<String, List<TableInfo>> pageMap = {};
+    return rawUrl;
+  }
 
-    for (int i = 1; i < rows.length; i++) {
-      final row = rows[i];
-      if (row.length >= 3) {
-        final String pageName = row[0].toString().trim();
-        final String tableName = row[1].toString().trim();
-        final String tableUrl = row[2].toString().trim();
+  /// Scarica e analizza il CSV indice (Pagina, Tabella, URL)
+  Future<List<PageConfig>> fetchGroupIndex(String indexCsvUrl) async {
+    final cleanUrl = indexCsvUrl.trim().replaceAll('\r', '').replaceAll('\n', '');
+    final uri = Uri.tryParse(cleanUrl);
 
-        if (pageName.isNotEmpty && tableUrl.isNotEmpty) {
-          pageMap.putIfAbsent(pageName, () => []);
-          pageMap[pageName]!.add(
-            TableInfo(tableName: tableName, csvUrl: tableUrl),
+    if (uri == null || !uri.hasAbsolutePath) {
+      throw Exception('URL dell\'indice CSV non valido: "$cleanUrl"');
+    }
+
+    final response = await http.get(uri);
+
+    if (response.statusCode != 200) {
+      throw Exception('Impossibile scaricare l\'indice CSV (${response.statusCode})');
+    }
+
+    final csvContent = utf8.decode(response.bodyBytes);
+    return parseIndexCsv(csvContent);
+  }
+
+  /// Converte il testo CSV dell'indice nelle strutture PageConfig e TableConfig
+  List<PageConfig> parseIndexCsv(String csvContent) {
+    final lines = LineSplitter.split(csvContent)
+        .where((line) => line.trim().isNotEmpty)
+        .toList();
+
+    if (lines.isEmpty) {
+      throw Exception('Il file CSV dell\'indice è vuoto.');
+    }
+
+    // Mappa per raggruppare le tabelle per pagina
+    final Map<String, List<TableConfig>> pageMap = {};
+
+    // Salta l'intestazione se presente (Pagina,Tabella,URL)
+    final startIndex = lines.first.toLowerCase().contains('pagina') ? 1 : 0;
+
+    for (int i = startIndex; i < lines.length; i++) {
+      final line = lines[i];
+      final columns = _parseCsvLine(line);
+
+      if (columns.length >= 3) {
+        final pageName = columns[0].trim();
+        final tableName = columns[1].trim();
+        final tableUrl = columns[2].trim().replaceAll('\r', '').replaceAll('\n', '');
+
+        if (pageName.isNotEmpty && tableName.isNotEmpty && tableUrl.isNotEmpty) {
+          final tableConfig = TableConfig(
+            tableName: tableName,
+            csvUrl: tableUrl,
           );
+
+          pageMap.putIfAbsent(pageName, () => []).add(tableConfig);
         }
       }
     }
 
     if (pageMap.isEmpty) {
-      throw Exception('Nessuna riga valida con 3 colonne trovata nel CSV.');
+      throw Exception('Nessuna pagina valida trovata nel CSV dell\'indice.');
     }
 
     return pageMap.entries
-        .map((entry) => PageConfig(pageName: entry.key, tables: entry.value))
+        .map((entry) => PageConfig(
+              pageName: entry.key,
+              tables: entry.value,
+            ))
         .toList();
+  }
+
+  /// Helper per la divisione corretta delle righe CSV gestendo le virgole
+  List<String> _parseCsvLine(String line) {
+    final List<String> result = [];
+    final StringBuffer current = StringBuffer();
+    bool insideQuotes = false;
+
+    for (int i = 0; i < line.length; i++) {
+      final char = line[i];
+
+      if (char == '"') {
+        insideQuotes = !insideQuotes;
+      } else if (char == ',' && !insideQuotes) {
+        result.add(current.toString());
+        current.clear();
+      } else {
+        current.write(char);
+      }
+    }
+    result.add(current.toString());
+
+    return result;
   }
 }
