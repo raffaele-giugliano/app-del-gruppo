@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/page_config.dart';
 import '../services/csv_service.dart';
 import 'table_view_screen.dart';
@@ -22,12 +23,56 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
   List<PageConfig> _pages = [];
   PageConfig? _selectedPage;
 
+  static const String _savedGroupKey = 'saved_group_name';
+
   @override
   void initState() {
     super.initState();
     final url = widget.backendBaseUrl ??
         'https://script.google.com/macros/s/AKfycbwqgA2-32aKByzYv9uM3Nks2p9q0I-U6q0_SXXD_4L0Q-73Amlu100QO5JByy4wT-yE/exec';
     _csvService = CsvService(backendBaseUrl: url);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initGroupData();
+    });
+  }
+
+  Future<void> _initGroupData() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // 1. Estrazione parametro dall'URL (supporta sia URL standard che con # di Flutter Web)
+    final Uri currentUri = Uri.base;
+    String? urlGroup = currentUri.queryParameters['group'];
+
+    if ((urlGroup == null || urlGroup.isEmpty) && currentUri.hasFragment) {
+      final fragmentUri = Uri.parse(currentUri.fragment);
+      urlGroup = fragmentUri.queryParameters['group'];
+    }
+
+    if (urlGroup != null && urlGroup.trim().isNotEmpty) {
+      final cleanUrlGroup = urlGroup.trim();
+      _groupController.text = cleanUrlGroup;
+      await _saveGroupToStorage(cleanUrlGroup);
+      _searchGroup();
+      return;
+    }
+
+    // 2. Lettura dal salvataggio locale se non presente nell'URL
+    final String? savedGroup = prefs.getString(_savedGroupKey);
+    if (savedGroup != null && savedGroup.trim().isNotEmpty) {
+      _groupController.text = savedGroup.trim();
+      _searchGroup();
+    }
+  }
+
+  Future<void> _saveGroupToStorage(String groupName) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_savedGroupKey, groupName);
+  }
+
+  Future<void> _clearGroupFromStorage() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_savedGroupKey);
   }
 
   Future<void> _searchGroup() async {
@@ -47,6 +92,8 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
       final indexCsvUrl = await _csvService.getCsvUrlForGroup(groupName);
       final pages = await _csvService.fetchGroupIndex(indexCsvUrl);
 
+      await _saveGroupToStorage(groupName);
+
       setState(() {
         _pages = pages;
         _isLoading = false;
@@ -61,12 +108,14 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
     }
   }
 
-  void _resetGroupSelection() {
+  Future<void> _resetGroupSelection() async {
+    await _clearGroupFromStorage();
     setState(() {
       _isGroupConfirmed = false;
       _pages = [];
       _selectedPage = null;
       _errorMessage = null;
+      _groupController.clear();
     });
   }
 
@@ -183,7 +232,6 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Bottone uniformato in blu con testo bianco
               ElevatedButton(
                 onPressed: _selectedPage == null ? null : _confirmPageSelection,
                 style: ElevatedButton.styleFrom(
