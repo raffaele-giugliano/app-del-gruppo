@@ -21,7 +21,6 @@ class _TableViewScreenState extends State<TableViewScreen> {
   List<Map<String, String>> _rows = [];
   int _highlightedIndex = -1;
 
-  final ScrollController _scrollController = ScrollController();
   final List<GlobalKey> _itemKeys = [];
 
   @override
@@ -31,7 +30,6 @@ class _TableViewScreenState extends State<TableViewScreen> {
   }
 
   Future<void> _loadData() async {
-    // Regola 1: Più tabelle collegate alla pagina
     if (widget.pageConfig.tables.length > 1) {
       setState(() {
         _errorMessage = 'Pagina con più tabelle: funzionalità in fase di sviluppo.';
@@ -42,7 +40,6 @@ class _TableViewScreenState extends State<TableViewScreen> {
 
     final table = widget.pageConfig.tables.first;
 
-    // Regola 2: URL mancante o vuoto
     if (table.csvUrl.trim().isEmpty) {
       setState(() {
         _errorMessage = 'URL della tabella non valido o mancante.';
@@ -66,7 +63,7 @@ class _TableViewScreenState extends State<TableViewScreen> {
         _isLoading = false;
       });
 
-      // Esegui lo scroll automatico alla scheda evidenziata
+      // Scroll automatico dopo che l'interfaccia è costruita
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _scrollToHighlightedItem();
       });
@@ -256,8 +253,9 @@ class _TableViewScreenState extends State<TableViewScreen> {
       );
     }
 
+    // ListView.builder permette lo scroll completo della lista schede
     return ListView.builder(
-      controller: _scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(12.0),
       itemCount: _rows.length,
       itemBuilder: (context, index) {
@@ -322,7 +320,7 @@ class _TableViewScreenState extends State<TableViewScreen> {
                                 TextSpan(
                                   children: [
                                     TextSpan(
-                                      text: '${entry.key} ',
+                                      text: '${entry.key}: ',
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         color: Colors.black87,

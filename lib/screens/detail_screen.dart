@@ -24,7 +24,9 @@ class DetailScreen extends StatelessWidget {
         title: const Text('Dettaglio'),
         centerTitle: true,
       ),
+      // SingleChildScrollView avvolge l'intera schermata consentendo lo scroll completo
       body: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

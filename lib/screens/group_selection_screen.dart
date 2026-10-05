@@ -17,6 +17,7 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
   late final CsvService _csvService;
 
   bool _isLoading = false;
+  bool _isGroupConfirmed = false;
   String? _errorMessage;
   List<PageConfig> _pages = [];
   PageConfig? _selectedPage;
@@ -33,6 +34,8 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
     final groupName = _groupController.text.trim();
     if (groupName.isEmpty) return;
 
+    FocusScope.of(context).unfocus();
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -47,13 +50,24 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
       setState(() {
         _pages = pages;
         _isLoading = false;
+        _isGroupConfirmed = true; // Blocca il nome del gruppo
       });
     } catch (e) {
       setState(() {
         _errorMessage = e.toString().replaceAll('Exception: ', '');
         _isLoading = false;
+        _isGroupConfirmed = false;
       });
     }
+  }
+
+  void _resetGroupSelection() {
+    setState(() {
+      _isGroupConfirmed = false;
+      _pages = [];
+      _selectedPage = null;
+      _errorMessage = null;
+    });
   }
 
   void _confirmPageSelection() {
@@ -74,35 +88,81 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
         title: const Text('Selezione Gruppo'),
         centerTitle: true,
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Campo Testo Nome Gruppo
             TextField(
               controller: _groupController,
+              enabled: !_isGroupConfirmed, // Disabilitato quando il gruppo è confermato
               decoration: InputDecoration(
                 labelText: 'Nome Gruppo',
-                prefixIcon: const Icon(Icons.search),
+                prefixIcon: const Icon(Icons.group),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.arrow_forward),
-                  onPressed: _searchGroup,
+              ),
+              onSubmitted: (_) {
+                if (!_isGroupConfirmed) _searchGroup();
+              },
+            ),
+            const SizedBox(height: 12),
+
+            // Tasto Cerca Gruppo o Tasto Cambia Gruppo con freccia <-
+            if (!_isGroupConfirmed)
+              ElevatedButton.icon(
+                onPressed: _isLoading ? null : _searchGroup,
+                icon: const Icon(Icons.search),
+                label: const Text('CERCA GRUPPO'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueAccent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              )
+            else
+              OutlinedButton.icon(
+                onPressed: _resetGroupSelection,
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('CAMBIA GRUPPO'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
-              onSubmitted: (_) => _searchGroup(),
-            ),
-            const SizedBox(height: 16),
+
+            const SizedBox(height: 24),
+
             if (_isLoading)
-              const Center(child: CircularProgressIndicator())
-            else if (_errorMessage != null)
-              Text(
-                _errorMessage!,
-                style: const TextStyle(color: Colors.red),
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(20.0),
+                  child: CircularProgressIndicator(),
+                ),
               )
-            else if (_pages.isNotEmpty) ...[
+            else if (_errorMessage != null)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _errorMessage!,
+                  style: const TextStyle(color: Colors.red),
+                  textAlign: TextAlign.center,
+                ),
+              )
+            else if (_isGroupConfirmed && _pages.isNotEmpty) ...[
+              const Divider(),
+              const SizedBox(height: 16),
               DropdownButtonFormField<PageConfig>(
                 decoration: InputDecoration(
                   labelText: 'Seleziona Pagina',
@@ -123,16 +183,26 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
                   });
                 },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
+
+              // Bottone di conferma: disabilitato se _selectedPage == null
               ElevatedButton(
                 onPressed: _selectedPage == null ? null : _confirmPageSelection,
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey.shade300,
+                  disabledForegroundColor: Colors.grey.shade600,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
+                  elevation: _selectedPage == null ? 0 : 3,
                 ),
-                child: const Text('CONFERMA SELEZIONE PAGINA'),
+                child: const Text(
+                  'CONFERMA SELEZIONE PAGINA',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ],
