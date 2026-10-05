@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'dart5/convert';
 import 'package:http/http.dart' as http;
 import '../models/page_config.dart';
 
@@ -48,7 +48,7 @@ class CsvService {
     return parseIndexCsv(csvContent);
   }
 
-  /// Converte il testo CSV dell'indice nelle strutture PageConfig e TableConfig
+  /// Converte il testo CSV dell'indice nelle strutture PageConfig e TableInfo
   List<PageConfig> parseIndexCsv(String csvContent) {
     final lines = LineSplitter.split(csvContent)
         .where((line) => line.trim().isNotEmpty)
@@ -59,7 +59,7 @@ class CsvService {
     }
 
     // Mappa per raggruppare le tabelle per pagina
-    final Map<String, List<TableConfig>> pageMap = {};
+    final Map<String, List<TableInfo>> pageMap = {};
 
     // Salta l'intestazione se presente (Pagina,Tabella,URL)
     final startIndex = lines.first.toLowerCase().contains('pagina') ? 1 : 0;
@@ -74,12 +74,12 @@ class CsvService {
         final tableUrl = columns[2].trim().replaceAll('\r', '').replaceAll('\n', '');
 
         if (pageName.isNotEmpty && tableName.isNotEmpty && tableUrl.isNotEmpty) {
-          final tableConfig = TableConfig(
+          final tableInfo = TableInfo(
             tableName: tableName,
             csvUrl: tableUrl,
           );
 
-          pageMap.putIfAbsent(pageName, () => []).add(tableConfig);
+          pageMap.putIfAbsent(pageName, () => []).add(tableInfo);
         }
       }
     }
@@ -96,7 +96,7 @@ class CsvService {
         .toList();
   }
 
-  /// Helper per la divisione corretta delle righe CSV gestendo le virgole
+  /// Helper per la divisione corretta delle righe CSV gestendo le virgolette
   List<String> _parseCsvLine(String line) {
     final List<String> result = [];
     final StringBuffer current = StringBuffer();
