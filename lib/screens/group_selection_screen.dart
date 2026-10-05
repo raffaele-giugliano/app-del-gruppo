@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/storage_service.dart';
 import '../services/csv_service.dart';
+import '../models/page_config.dart';
 
 class GroupSelectionScreen extends StatefulWidget {
   final String backendBaseUrl;
@@ -23,13 +24,15 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
   bool _isSearching = false;
   String? _errorMessage;
 
+  List<PageConfig> _availablePages = [];
+  PageConfig? _selectedPage;
+
   @override
   void initState() {
     super.initState();
     _checkSavedGroup();
   }
 
-  /// Controlla all'avvio se esiste già un gruppo memorizzato
   Future<void> _checkSavedGroup() async {
     final group = await _storageService.getSavedGroup();
     setState(() {
@@ -39,54 +42,66 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
       }
       _isLoading = false;
     });
+
+    if (group != null) {
+      _loadGroupData(group);
+    }
   }
 
-  /// Invia il gruppo al BE per verificare la validità e ottenere l'URL
-  Future<void> _submitGroup(String groupName) async {
-    if (groupName.trim().isEmpty) {
-      setState(() {
-        _errorMessage = 'Inserisci il nome del gruppo';
-      });
-      return;
-    }
-
+  Future<void> _loadGroupData(String groupName) async {
     setState(() {
       _isSearching = true;
       _errorMessage = null;
+      _availablePages = [];
+      _selectedPage = null;
     });
 
     try {
       final csvService = CsvService(backendBaseUrl: widget.backendBaseUrl);
-      final csvUrl = await csvService.getCsvUrlForGroup(groupName);
+      final indexCsvUrl = await csvService.getCsvUrlForGroup(groupName);
+      final pages = await csvService.fetchGroupIndex(indexCsvUrl);
 
       await _storageService.saveGroup(groupName);
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gruppo trovato! URL: $csvUrl')),
-      );
-
       setState(() {
         _savedGroup = groupName;
+        _availablePages = pages;
+        if (pages.isNotEmpty) {
+          _selectedPage = pages.first;
+        }
         _isSearching = false;
       });
     } catch (e) {
       setState(() {
-        _errorMessage = 'Gruppo non trovato o non valido.';
+        _errorMessage = 'Impossibile recuperare i dati del gruppo.';
         _isSearching = false;
       });
     }
   }
 
-  /// Cancella il gruppo salvato per avviarne una nuova ricerca
   Future<void> _resetGroup() async {
     await _storageService.clearGroup();
     setState(() {
       _savedGroup = null;
       _groupController.clear();
       _errorMessage = null;
+      _availablePages = [];
+      _selectedPage = null;
     });
+  }
+
+  void _confirmPageSelection() {
+    if (_selectedPage == null) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Pagina selezionata: ${_selectedPage!.pageName} (${_selectedPage!.tables.length} tabelle collegate)',
+        ),
+      ),
+    );
   }
 
   @override
@@ -108,7 +123,7 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
           child: SingleChildScrollView(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch, // <--- Corretto qui (CrossAxisAlignment)
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Icon(
                   Icons.groups_rounded,
@@ -136,32 +151,59 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
                       color: Colors.black87,
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
 
-                  ElevatedButton(
-                    onPressed: _isSearching ? null : () => _submitGroup(_savedGroup!),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orangeAccent[700],
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      elevation: 5,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  if (_isSearching) ...[
+                    const Center(child: CircularProgressIndicator()),
+                  ] else if (_availablePages.isNotEmpty) ...[
+                    DropdownButtonFormField<PageConfig>(
+                      value: _selectedPage,
+                      decoration: InputDecoration(
+                        labelText: 'Seleziona Pagina',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        prefixIcon: const Icon(Icons.web_rounded),
+                      ),
+                      items: _availablePages.map((page) {
+                        return DropdownMenuItem<PageConfig>(
+                          value: page,
+                          child: Text(page.pageName),
+                        );
+                      }).toList(),
+                      onChanged: (PageConfig? newPage) {
+                        setState(() {
+                          _selectedPage = newPage;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 20),
+
+                    ElevatedButton(
+                      onPressed: _confirmPageSelection,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blueAccent[700],
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        elevation: 5,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'CONFERMA SELEZIONE PAGINA',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                     ),
-                    child: _isSearching
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                          )
-                        : const Text(
-                            'ACCEDI AI DATI DEL GRUPPO',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1),
-                          ),
-                  ),
-                  const SizedBox(height: 16),
+                  ] else ...[
+                    const Text(
+                      'Nessuna pagina disponibile per questo gruppo.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ],
 
+                  const SizedBox(height: 16),
                   OutlinedButton(
                     onPressed: _resetGroup,
                     style: OutlinedButton.styleFrom(
@@ -185,7 +227,7 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
                     controller: _groupController,
                     decoration: InputDecoration(
                       labelText: 'Nome Gruppo',
-                      hintText: 'Es: CSRB_2013_SquadraB',
+                      hintText: 'La_mia_squadra', // <--- Aggiornato Hint
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -196,7 +238,7 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
                   const SizedBox(height: 24),
 
                   ElevatedButton(
-                    onPressed: _isSearching ? null : () => _submitGroup(_groupController.text),
+                    onPressed: _isSearching ? null : () => _loadGroupData(_groupController.text),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blueAccent[700],
                       foregroundColor: Colors.white,
