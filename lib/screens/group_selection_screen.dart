@@ -33,6 +33,7 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
     _checkSavedGroup();
   }
 
+  /// Verifica se esiste un gruppo memorizzato localmente all'avvio
   Future<void> _checkSavedGroup() async {
     final group = await _storageService.getSavedGroup();
     setState(() {
@@ -48,7 +49,15 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
     }
   }
 
+  /// Recupera l'URL dal Backend, scarica il CSV indice e popola le pagine
   Future<void> _loadGroupData(String groupName) async {
+    if (groupName.trim().isEmpty) {
+      setState(() {
+        _errorMessage = 'Inserisci il nome del gruppo';
+      });
+      return;
+    }
+
     setState(() {
       _isSearching = true;
       _errorMessage = null;
@@ -58,9 +67,14 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
 
     try {
       final csvService = CsvService(backendBaseUrl: widget.backendBaseUrl);
+      
+      // 1. Chiamata al Worker Backend per ottenere l'URL dell'indice
       final indexCsvUrl = await csvService.getCsvUrlForGroup(groupName);
+
+      // 2. Scaricamento e parsing dell'indice CSV
       final pages = await csvService.fetchGroupIndex(indexCsvUrl);
 
+      // Salva il gruppo valido in locale
       await _storageService.saveGroup(groupName);
 
       if (!mounted) return;
@@ -74,13 +88,16 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
         _isSearching = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _errorMessage = 'Impossibile recuperare i dati del gruppo.';
+        // Mostra il messaggio esatto dell'eccezione per identificare la causa (CORS, 404, parsing, ecc.)
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
         _isSearching = false;
       });
     }
   }
 
+  /// Cancella il gruppo salvato e ripristina la schermata di ricerca
   Future<void> _resetGroup() async {
     await _storageService.clearGroup();
     setState(() {
@@ -92,6 +109,7 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
     });
   }
 
+  /// Azione alla conferma della pagina selezionata dal menu a tendina
   void _confirmPageSelection() {
     if (_selectedPage == null) return;
 
@@ -203,6 +221,15 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
                     ),
                   ],
 
+                  if (_errorMessage != null) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      _errorMessage!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.red, fontSize: 13),
+                    ),
+                  ],
+
                   const SizedBox(height: 16),
                   OutlinedButton(
                     onPressed: _resetGroup,
@@ -227,7 +254,7 @@ class _GroupSelectionScreenState extends State<GroupSelectionScreen> {
                     controller: _groupController,
                     decoration: InputDecoration(
                       labelText: 'Nome Gruppo',
-                      hintText: 'La_mia_squadra', // <--- Aggiornato Hint
+                      hintText: 'La_mia_squadra',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
