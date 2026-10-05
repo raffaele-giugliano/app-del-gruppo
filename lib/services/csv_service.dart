@@ -7,61 +7,60 @@ class CsvService {
 
   CsvService({required this.backendBaseUrl});
 
-  /// Chiede al Backend/Worker l'URL dell'indice CSV per un determinato gruppo
+  /// 1. Recupera l'URL dal Backend e lo pulisce da caratteri invisibili
   Future<String> getCsvUrlForGroup(String groupName) async {
     final cleanGroup = groupName.trim();
-    final uri = Uri.parse('$backendBaseUrl?group=$cleanGroup');
+    final url = '$backendBaseUrl?group=${Uri.encodeComponent(cleanGroup)}';
 
-    final response = await http.get(uri);
+    final response = await http.get(Uri.parse(url));
 
     if (response.statusCode != 200) {
-      throw Exception('Gruppo non trovato o errore backend (${response.statusCode})');
+      throw Exception('Errore Backend (HTTP ${response.statusCode})');
     }
 
-    // Pulizia della stringa restituita dal backend
-    final rawUrl = response.body.trim().replaceAll('\r', '').replaceAll('\n', '');
+    // Pulizia rigorosa da spazi, virgolette e a capo
+    String rawUrl = response.body.trim();
+    rawUrl = rawUrl.replaceAll('\r', '').replaceAll('\n', '');
+    if (rawUrl.startsWith('"') && rawUrl.endsWith('"')) {
+      rawUrl = rawUrl.substring(1, rawUrl.length - 1);
+    }
 
-    final parsedUri = Uri.tryParse(rawUrl);
-    if (parsedUri == null || !parsedUri.hasAbsolutePath) {
-      throw Exception('L\'URL restituito dal backend non è valido: "$rawUrl"');
+    if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
+      throw Exception('URL dal backend non valido: "$rawUrl"');
     }
 
     return rawUrl;
   }
 
-  /// Scarica e analizza il CSV indice (Pagina, Tabella, URL)
+  /// 2. Scarica il file CSV usando esattamente lo stesso metodo delle app precedenti
   Future<List<PageConfig>> fetchGroupIndex(String indexCsvUrl) async {
-    final cleanUrl = indexCsvUrl.trim().replaceAll('\r', '').replaceAll('\n', '');
-    final uri = Uri.tryParse(cleanUrl);
-
-    if (uri == null || !uri.hasAbsolutePath) {
-      throw Exception('URL dell\'indice CSV non valido: "$cleanUrl"');
-    }
+    // Usiamo Uri.parse direttamente sulla stringa pulita, esattamente come per i link hardcoded
+    final uri = Uri.parse(indexCsvUrl.trim());
 
     final response = await http.get(uri);
 
     if (response.statusCode != 200) {
-      throw Exception('Impossibile scaricare l\'indice CSV (${response.statusCode})');
+      throw Exception('Errore download CSV (HTTP ${response.statusCode})');
     }
 
+    // Decodifica UTF-8
     final csvContent = utf8.decode(response.bodyBytes);
     return parseIndexCsv(csvContent);
   }
 
-  /// Converte il testo CSV dell'indice nelle strutture PageConfig e TableInfo
+  /// 3. Parsing delle righe CSV
   List<PageConfig> parseIndexCsv(String csvContent) {
     final lines = LineSplitter.split(csvContent)
         .where((line) => line.trim().isNotEmpty)
         .toList();
 
     if (lines.isEmpty) {
-      throw Exception('Il file CSV dell\'indice è vuoto.');
+      throw Exception('Il file CSV scaricato è vuoto.');
     }
 
-    // Mappa per raggruppare le tabelle per pagina
     final Map<String, List<TableInfo>> pageMap = {};
 
-    // Salta l'intestazione se presente (Pagina,Tabella,URL)
+    // Salta l'intestazione se la prima riga contiene "pagina"
     final startIndex = lines.first.toLowerCase().contains('pagina') ? 1 : 0;
 
     for (int i = startIndex; i < lines.length; i++) {
@@ -71,7 +70,7 @@ class CsvService {
       if (columns.length >= 3) {
         final pageName = columns[0].trim();
         final tableName = columns[1].trim();
-        final tableUrl = columns[2].trim().replaceAll('\r', '').replaceAll('\n', '');
+        final tableUrl = columns[2].trim();
 
         if (pageName.isNotEmpty && tableName.isNotEmpty && tableUrl.isNotEmpty) {
           final tableInfo = TableInfo(
@@ -85,7 +84,7 @@ class CsvService {
     }
 
     if (pageMap.isEmpty) {
-      throw Exception('Nessuna pagina valida trovata nel CSV dell\'indice.');
+      throw Exception('Nessun dato trovato nel CSV.');
     }
 
     return pageMap.entries
@@ -96,7 +95,7 @@ class CsvService {
         .toList();
   }
 
-  /// Helper per la divisione corretta delle righe CSV gestendo le virgolette
+  /// Separazione colonne gestendo eventuali virgolette
   List<String> _parseCsvLine(String line) {
     final List<String> result = [];
     final StringBuffer current = StringBuffer();
