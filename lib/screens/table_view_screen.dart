@@ -19,7 +19,7 @@ class _TableViewScreenState extends State<TableViewScreen> {
   String? _errorMessage;
 
   List<String> _headers = [];
-  List _rows = []; // Usiamo List semplice per evitare errori di compilazione
+  List _rows = []; // Lista dinamica per evitare problemi di compilazione con i generici
   int _highlightedIndex = -1;
 
   final List<GlobalKey> _itemKeys = [];
@@ -75,19 +75,27 @@ class _TableViewScreenState extends State<TableViewScreen> {
     }
   }
 
-  /// Funzione per formattare la data nel formato desiderato: 01-11-2026 - Sabato
+  /// Funzione sicura per formattare la data (evita errori di localizzazione su Flutter Web)
   String _formatDateNicely(String originalVal) {
     DateTime? dt = _parseDate(originalVal);
     if (dt == null) {
       return originalVal;
     }
 
-    // Formato dd-MM-yyyy
+    // Formato numerico dd-MM-yyyy
     String datePart = DateFormat('dd-MM-yyyy').format(dt);
     
-    // Giorno della settimana in italiano (es. Sabato)
-    String weekdayPart = DateFormat('EEEE', 'it_IT').format(dt);
-    weekdayPart = weekdayPart[0].toUpperCase() + weekdayPart.substring(1);
+    // Giorno della settimana in italiano tramite array nativo
+    const weekdays = [
+      'Lunedì', 
+      'Martedì', 
+      'Mercoledì', 
+      'Giovedì', 
+      'Venerdì', 
+      'Sabato', 
+      'Domenica'
+    ];
+    String weekdayPart = weekdays[dt.weekday - 1];
 
     return '$datePart - $weekdayPart';
   }
@@ -103,7 +111,7 @@ class _TableViewScreenState extends State<TableViewScreen> {
 
     _headers = _parseCsvLine(lines.first).map((e) => e.trim()).toList();
 
-    List parsedRows = []; // Usiamo List semplice
+    List parsedRows = [];
 
     for (int i = 1; i < lines.length; i++) {
       final values = _parseCsvLine(lines[i]);
@@ -133,7 +141,7 @@ class _TableViewScreenState extends State<TableViewScreen> {
     }
   }
 
-  void _processDateOrDayOrdering(List rows, String firstColName) { // Usiamo List semplice
+  void _processDateOrDayOrdering(List rows, String firstColName) {
     final DateTime now = DateTime.now();
     final DateTime today = DateTime(now.year, now.month, now.day);
 
