@@ -20,7 +20,8 @@ class _TableViewScreenState extends State<TableViewScreen> {
 
   List<String> _headers = [];
   // CORRETTO: Aggiunto il tipo completo >
-  List> _rows = [];
+  //List> _rows = [];
+  List _rows = [];
   int _highlightedIndex = -1;
 
   final List<GlobalKey> _itemKeys = [];
