@@ -19,9 +19,7 @@ class _TableViewScreenState extends State<TableViewScreen> {
   String? _errorMessage;
 
   List<String> _headers = [];
-  // CORRETTO: Aggiunto il tipo completo >
-  //List> _rows = [];
-  List _rows = [];
+  List _rows = []; // Usiamo List semplice per evitare errori di compilazione
   int _highlightedIndex = -1;
 
   final List<GlobalKey> _itemKeys = [];
@@ -91,7 +89,6 @@ class _TableViewScreenState extends State<TableViewScreen> {
     String weekdayPart = DateFormat('EEEE', 'it_IT').format(dt);
     weekdayPart = weekdayPart[0].toUpperCase() + weekdayPart.substring(1);
 
-    // CORRETTO: Unito in un'unica stringa per evitare errori di sintassi
     return '$datePart - $weekdayPart';
   }
 
@@ -106,7 +103,7 @@ class _TableViewScreenState extends State<TableViewScreen> {
 
     _headers = _parseCsvLine(lines.first).map((e) => e.trim()).toList();
 
-    List> parsedRows = [];
+    List parsedRows = []; // Usiamo List semplice
 
     for (int i = 1; i < lines.length; i++) {
       final values = _parseCsvLine(lines[i]);
@@ -136,8 +133,7 @@ class _TableViewScreenState extends State<TableViewScreen> {
     }
   }
 
-  // CORRETTO: Aggiunto il tipo completo >
-  void _processDateOrDayOrdering(List> rows, String firstColName) {
+  void _processDateOrDayOrdering(List rows, String firstColName) { // Usiamo List semplice
     final DateTime now = DateTime.now();
     final DateTime today = DateTime(now.year, now.month, now.day);
 
