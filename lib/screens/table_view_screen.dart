@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:intl/intl.dart'; // Assicurati di aggiungere intl nel pubspec.yaml se non c'è già
+import 'package:intl/intl.dart';
 import '../models/page_config.dart';
 import 'detail_screen.dart';
 
@@ -79,7 +79,6 @@ class _TableViewScreenState extends State<TableViewScreen> {
   String _formatDateNicely(String originalVal) {
     DateTime? dt = _parseDate(originalVal);
     if (dt == null) {
-      // Se non è una data in formato numerico, proviamo a vedere se è un giorno della settimana o torniamo il valore originale
       return originalVal;
     }
 
@@ -113,7 +112,6 @@ class _TableViewScreenState extends State<TableViewScreen> {
       for (int j = 0; j < _headers.length; j++) {
         String val = j < values.length ? values[j].trim() : '';
         
-        // Se siamo nella prima colonna (ipotetica colonna data/giorno), formattiamola fin dall'origine
         if (j == 0 && _headers.isNotEmpty && _headers.first.toLowerCase().contains('giorno')) {
           val = _formatDateNicely(val);
         }
@@ -143,7 +141,6 @@ class _TableViewScreenState extends State<TableViewScreen> {
 
     for (var row in rows) {
       final val = row[firstColName] ?? '';
-      // Per il parsing cerchiamo di estrarre la data anche se è già formattata
       DateTime? dt = _parseDate(val);
       if (dt == null) {
         dt = _parseWeekdayToNextDate(val, today);
@@ -172,7 +169,6 @@ class _TableViewScreenState extends State<TableViewScreen> {
   }
 
   DateTime? _parseDate(String val) {
-    // Pulisce la stringa nel caso contenga già il testo del giorno della settimana aggiunto
     final cleanVal = val.split(' - ').first;
     final parts = cleanVal.replaceAll('/', '-').split('-');
     if (parts.length == 3) {
