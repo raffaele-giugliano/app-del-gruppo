@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:intl/intl.dart'; // Assicurati di aggiungere intl nel pubspec.yaml se non c'è già
 import '../models/page_config.dart';
 import 'detail_screen.dart';
 
@@ -18,7 +19,7 @@ class _TableViewScreenState extends State<TableViewScreen> {
   String? _errorMessage;
 
   List<String> _headers = [];
-  List<Map<String, String>> _rows = [];
+  List> _rows = [];
   int _highlightedIndex = -1;
 
   final List<GlobalKey> _itemKeys = [];
@@ -63,7 +64,6 @@ class _TableViewScreenState extends State<TableViewScreen> {
         _isLoading = false;
       });
 
-      // Scroll automatico dopo che l'interfaccia è costruita
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _scrollToHighlightedItem();
       });
@@ -73,6 +73,24 @@ class _TableViewScreenState extends State<TableViewScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  /// Funzione per formattare la data nel formato desiderato: 01-11-2026 - Sabato
+  String _formatDateNicely(String originalVal) {
+    DateTime? dt = _parseDate(originalVal);
+    if (dt == null) {
+      // Se non è una data in formato numerico, proviamo a vedere se è un giorno della settimana o torniamo il valore originale
+      return originalVal;
+    }
+
+    // Formato dd-MM-yyyy
+    String datePart = DateFormat('dd-MM-yyyy').format(dt);
+    
+    // Giorno della settimana in italiano (es. Sabato)
+    String weekdayPart = DateFormat('EEEE', 'it_IT').format(dt);
+    weekdayPart = weekdayPart[0].toUpperCase() + weekdayPart.substring(1);
+
+    return '$datePart - $weekdayPart';
   }
 
   void _parseCsvData(String csvContent) {
@@ -86,14 +104,21 @@ class _TableViewScreenState extends State<TableViewScreen> {
 
     _headers = _parseCsvLine(lines.first).map((e) => e.trim()).toList();
 
-    List<Map<String, String>> parsedRows = [];
+    List> parsedRows = [];
 
     for (int i = 1; i < lines.length; i++) {
       final values = _parseCsvLine(lines[i]);
       final Map<String, String> rowMap = {};
 
       for (int j = 0; j < _headers.length; j++) {
-        rowMap[_headers[j]] = j < values.length ? values[j].trim() : '';
+        String val = j < values.length ? values[j].trim() : '';
+        
+        // Se siamo nella prima colonna (ipotetica colonna data/giorno), formattiamola fin dall'origine
+        if (j == 0 && _headers.isNotEmpty && _headers.first.toLowerCase().contains('giorno')) {
+          val = _formatDateNicely(val);
+        }
+        
+        rowMap[_headers[j]] = val;
       }
       parsedRows.add(rowMap);
     }
@@ -110,7 +135,7 @@ class _TableViewScreenState extends State<TableViewScreen> {
     }
   }
 
-  void _processDateOrDayOrdering(List<Map<String, String>> rows, String firstColName) {
+  void _processDateOrDayOrdering(List> rows, String firstColName) {
     final DateTime now = DateTime.now();
     final DateTime today = DateTime(now.year, now.month, now.day);
 
@@ -118,8 +143,8 @@ class _TableViewScreenState extends State<TableViewScreen> {
 
     for (var row in rows) {
       final val = row[firstColName] ?? '';
+      // Per il parsing cerchiamo di estrarre la data anche se è già formattata
       DateTime? dt = _parseDate(val);
-
       if (dt == null) {
         dt = _parseWeekdayToNextDate(val, today);
       }
@@ -147,7 +172,9 @@ class _TableViewScreenState extends State<TableViewScreen> {
   }
 
   DateTime? _parseDate(String val) {
-    final parts = val.replaceAll('/', '-').split('-');
+    // Pulisce la stringa nel caso contenga già il testo del giorno della settimana aggiunto
+    final cleanVal = val.split(' - ').first;
+    final parts = cleanVal.replaceAll('/', '-').split('-');
     if (parts.length == 3) {
       final day = int.tryParse(parts[0]);
       final month = int.tryParse(parts[1]);
@@ -253,7 +280,6 @@ class _TableViewScreenState extends State<TableViewScreen> {
       );
     }
 
-    // ListView.builder permette lo scroll completo della lista schede
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(12.0),
